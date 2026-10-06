@@ -3,207 +3,841 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Transmissão ao vivo</title>
+<title>ChampLive</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@700;800&family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --bg: #0E0E10;
+    --painel: #18181B;
+    --painel-2: #1F1F24;
+    --borda: #26262C;
+    --borda-2: #2E2E35;
+    --borda-botao: #34343C;
+    --texto: #EFEFF1;
+    --texto-2: #D4D4DA;
+    --texto-fraco: #ADADB8;
+    --texto-apagado: #6B6B76;
+    --destaque: #F5B83D;
+    --destaque-hover: #FFD27A;
+    --sobre-destaque: #141414;
+    --vermelho: #D13438;
+    --ponto-vivo: #E5484D;
+    --fonte: 'DM Sans', system-ui, -apple-system, "Segoe UI", sans-serif;
+    --fonte-titulo: 'Archivo', 'DM Sans', system-ui, sans-serif;
+    --fonte-mono: 'JetBrains Mono', ui-monospace, monospace;
+  }
   * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; }
   body {
     margin: 0;
-    min-height: 100vh;
-    background: #0d0d0f;
-    color: #e8e8ea;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    font-family: var(--fonte);
+    display: flex;
+    flex-direction: column;
+  }
+  button { font-family: inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible {
+    outline: 2px solid var(--destaque);
+    outline-offset: 2px;
+  }
+  svg { flex: none; }
+
+  /* ===== Cabeçalho ===== */
+  .topo {
+    height: 60px;
+    flex: none;
+    padding: 0 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--painel);
+    border-bottom: 1px solid var(--borda);
+  }
+  .marca {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--texto);
+    text-decoration: none;
+  }
+  .marca-icone {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    background: var(--destaque);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .marca-nome {
+    font-family: var(--fonte-titulo);
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.02em;
+  }
+  .espaco { flex: 1; }
+  .botao {
+    height: 40px;
+    padding: 0 16px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 8px;
+    font: 600 14px var(--fonte);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .botao-contorno {
+    background: transparent;
+    color: var(--texto);
+    border: 1px solid var(--borda-botao);
+    padding: 0 14px;
+  }
+  .botao-contorno:hover { background: var(--borda); }
+  .botao-destaque {
+    background: var(--destaque);
+    color: var(--sobre-destaque);
+    border: none;
+    font-weight: 700;
+  }
+  .botao-destaque:hover { background: var(--destaque-hover); }
+  .botao-destaque:disabled { opacity: 0.6; cursor: wait; }
+  .botao-parar {
+    background: var(--vermelho);
+    color: #fff;
+    border: none;
+    font-weight: 700;
+  }
+  .botao-parar:hover { background: #B42A2E; }
+  .botao-alto { height: 44px; padding: 0 18px; }
+  .ponto-pulsando {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #fff;
+    animation: pulsar 1.4s ease-in-out infinite;
+  }
+  @keyframes pulsar { 50% { opacity: 0.35; } }
+
+  /* ===== Layout ===== */
+  .conteudo {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    min-height: 0;
+  }
+
+  /* ===== Lista de lives ===== */
+  .lateral {
+    flex: 1 1 240px;
+    max-width: 280px;
+    background: var(--painel);
+    border-right: 1px solid var(--borda);
+    padding: 16px 10px;
+  }
+  .lateral-titulo {
+    padding: 0 10px 10px;
+    font: 700 12px var(--fonte);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--texto-fraco);
+  }
+  .lives {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .live-item {
+    width: 100%;
+    min-height: 52px;
+    padding: 8px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--texto);
+    text-align: left;
+    cursor: pointer;
+  }
+  .live-item:hover { background: var(--painel-2); }
+  .live-item.ativa { background: var(--borda); }
+  .avatar {
+    width: 36px;
+    height: 36px;
+    flex: none;
+    border-radius: 50%;
+    color: var(--sobre-destaque);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: 700 15px var(--fonte-titulo);
+  }
+  .live-textos {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .live-nome {
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .live-origem { font-size: 12px; color: var(--texto-fraco); }
+  .live-viewers {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .ponto-vivo {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--ponto-vivo);
+  }
+  .lives-vazio {
+    padding: 8px 10px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--texto-fraco);
+  }
+  .lives-vazio button {
+    padding: 0;
+    background: none;
+    border: none;
+    color: var(--destaque);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
+  }
+
+  /* ===== Player ===== */
+  .principal {
+    flex: 999 1 560px;
+    min-width: 0;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  .player {
+    position: relative;
+    width: 100%;
+    max-width: 1280px;
+    aspect-ratio: 16 / 9;
+    background: #000;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--borda);
+  }
+  .player:fullscreen { border: none; border-radius: 0; max-width: none; }
+  .player video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    background: #000;
+  }
+  .player-msg {
+    position: absolute;
+    inset: 0;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 10px;
     padding: 24px;
-  }
-  h1 {
-    font-size: 1.1rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
-    margin: 0 0 16px;
-    color: #f5f5f5;
-  }
-  .status {
-    font-size: 0.85rem;
-    color: #8a8a90;
-    margin-bottom: 16px;
-    min-height: 1.2em;
-  }
-  .status.live { color: #4ade80; }
-  .status.error { color: #f87171; }
-  .status.recording { color: #f59e0b; }
-  .aviso-hls {
-    display: none;
-    max-width: 960px;
-    font-size: 0.8rem;
-    color: #fcd34d;
-    background: #2a2213;
-    border: 1px solid #5c4a1c;
-    border-radius: 6px;
-    padding: 8px 14px;
-    margin-bottom: 12px;
+    color: var(--texto-apagado);
     text-align: center;
+    pointer-events: none;
   }
-  .aviso-hls.visivel { display: block; }
-  .viewers {
-    font-size: 0.8rem;
-    color: #a8a8ae;
-    margin-bottom: 12px;
+  .player.ao-vivo .player-msg { display: none; }
+  .player-msg-titulo { font-size: 15px; color: var(--texto-fraco); }
+  .player-msg-texto { font-size: 13px; }
+  .player-msg-texto.error { color: #F28B8E; }
+  .player-selos {
+    position: absolute;
+    top: 14px;
+    left: 14px;
+    display: flex;
+    gap: 8px;
+  }
+  .player:not(.ao-vivo) .player-selos { display: none; }
+  .selo {
+    height: 26px;
+    padding: 0 9px;
     display: flex;
     align-items: center;
     gap: 6px;
+    border-radius: 6px;
+    color: #fff;
   }
-  .lives-menu {
+  .selo-vivo {
+    background: var(--vermelho);
+    font: 800 12px var(--fonte-titulo);
+    letter-spacing: 0.06em;
+  }
+  .selo-viewers {
+    background: rgba(0, 0, 0, 0.72);
+    font: 600 13px var(--fonte);
+  }
+  .controles {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 52px;
+    padding: 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+    transition: opacity 0.25s;
+  }
+  .player.ocioso .controles { opacity: 0; }
+  .player.ocioso { cursor: none; }
+  .controle {
+    width: 44px;
+    height: 44px;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .controle:hover { background: rgba(255, 255, 255, 0.12); }
+  .aviso-som {
+    padding: 6px 4px;
+    background: none;
+    border: none;
+    font-size: 13px;
+    color: var(--texto-2);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+  .aviso-som:hover { color: #fff; }
+
+  /* aviso amarelo do modo compatibilidade (HLS) */
+  .aviso-hls {
+    display: none;
+    max-width: 1280px;
+    padding: 12px 16px;
+    gap: 12px;
+    align-items: flex-start;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #FCD34D;
+    background: #2A2213;
+    border: 1px solid #5C4A1C;
+    border-radius: 10px;
+  }
+  .aviso-hls.visivel { display: flex; }
+
+  /* ===== Informações da live ===== */
+  .info {
+    max-width: 1280px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+  }
+  .info .avatar {
+    width: 56px;
+    height: 56px;
+    font: 800 22px var(--fonte-titulo);
+    box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--borda-botao);
+  }
+  .info.ao-vivo .avatar { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--vermelho); }
+  .info-textos {
+    flex: 1;
+    min-width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .info h1 {
+    margin: 0;
+    font: 700 22px var(--fonte-titulo);
+    letter-spacing: -0.01em;
+    overflow-wrap: anywhere;
+  }
+  .chips {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
-    justify-content: center;
-    margin-bottom: 20px;
-    max-width: 960px;
   }
-  .lives-menu button {
-    background: #1a1a1d;
-    border: 1px solid #2e2e33;
-    color: #c8c8ce;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 0.85rem;
-    cursor: pointer;
+  .chip {
+    height: 26px;
+    padding: 0 10px;
+    display: flex;
+    align-items: center;
+    background: var(--borda);
+    border-radius: 13px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--texto-2);
+  }
+  .chip-amarelo { background: #2A2213; color: #FCD34D; }
+  .info-numeros {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 4px;
+  }
+  .info-viewers {
     display: flex;
     align-items: center;
     gap: 6px;
+    font: 700 18px var(--fonte-titulo);
   }
-  .lives-menu button:hover { background: #26262a; }
-  .lives-menu button.active {
-    background: #2d4a34;
-    border-color: #4ade80;
-    color: #e8e8ea;
+  .info-viewers .ponto-vivo { width: 9px; height: 9px; }
+  .info:not(.ao-vivo) .info-viewers .ponto-vivo { background: var(--texto-apagado); }
+  .info-tempo { font-size: 13px; color: var(--texto-fraco); }
+
+  /* ===== Janelas (ajuda e transmitir) ===== */
+  .fundo-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    background: rgba(6, 6, 8, 0.78);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 56px 16px;
+    overflow-y: auto;
   }
-  .lives-menu button .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: #4ade80;
+  .modal {
+    width: 100%;
+    max-width: 720px;
+    background: var(--painel);
+    border: 1px solid var(--borda-2);
+    border-radius: 16px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
   }
-  .lives-menu .empty {
-    font-size: 0.85rem;
-    color: #6a6a70;
+  .modal-estreito { max-width: 480px; margin-top: 40px; }
+  .modal-topo {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
   }
-  video {
-    width: 95vw;
-    max-width: 1600px;
-    background: #000;
+  .modal-topo > div {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .modal h2 {
+    margin: 0;
+    font: 800 24px var(--fonte-titulo);
+    letter-spacing: -0.01em;
+  }
+  .modal-estreito h2 { font-size: 22px; }
+  .modal-topo p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.4;
+    color: var(--texto-fraco);
+  }
+  .modal-estreito .modal-topo p { font-size: 14px; }
+  .fechar {
+    width: 44px;
+    height: 44px;
+    flex: none;
+    margin: -8px -8px 0 0;
+    background: transparent;
+    border: none;
+    color: var(--texto-fraco);
+    display: flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
-    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
-  }
-  .config {
-    margin-top: 20px;
-    font-size: 0.8rem;
-    color: #6a6a70;
-    text-align: center;
-  }
-  .toggle-btn {
-    background: #2e2e33;
-    border: 1px solid #3a3a40;
-    color: #e8e8ea;
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 0.85rem;
     cursor: pointer;
-    transition: background 0.2s;
-    margin-bottom: 20px;
   }
-  .toggle-btn:hover { background: #3a3a40; }
-  .toggle-btn.active {
-    background: #dc2626;
-    border-color: #dc2626;
+  .fechar:hover { background: var(--borda); color: var(--texto); }
+
+  .abas {
+    padding: 4px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+    background: var(--bg);
+    border-radius: 10px;
   }
-  .quick-panel {
-    display: none;
-    width: 95vw;
-    max-width: 1600px;
-    background: #161618;
-    border: 1px solid #2e2e33;
+  .aba {
+    min-height: 56px;
+    padding: 8px 12px;
+    border: none;
     border-radius: 8px;
-    padding: 20px;
-    margin-bottom: 20px;
-    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: transparent;
+    color: var(--texto-fraco);
+    cursor: pointer;
   }
-  .quick-panel.open { display: block; }
-  .quick-panel h2 {
-    font-size: 1rem;
-    margin: 0 0 12px;
-    color: #f5f5f5;
+  .aba[aria-selected="true"] { background: var(--borda-2); color: var(--texto); }
+  .aba strong { font-size: 14px; }
+  .aba span { font-size: 12px; opacity: 0.8; }
+
+  .passos {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    counter-reset: passo;
   }
-  .quick-controls {
+  .passos li {
+    display: flex;
+    gap: 14px;
+    counter-increment: passo;
+  }
+  .passos li::before {
+    content: counter(passo);
+    width: 30px;
+    height: 30px;
+    flex: none;
+    border-radius: 50%;
+    background: var(--destaque);
+    color: var(--sobre-destaque);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font: 800 14px var(--fonte-titulo);
+  }
+  .passos li > div {
+    flex: 1;
+    min-width: 0;
+    padding-top: 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .passos strong { font-size: 15px; }
+  .passos span {
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--texto-fraco);
+  }
+  .caixa-codigo {
+    margin-top: 4px;
+    padding: 12px 14px;
+    background: var(--bg);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    font-size: 13px;
+  }
+  .caixa-codigo.grade {
+    display: grid;
+    grid-template-columns: 90px minmax(0, 1fr);
+    gap: 6px 12px;
+    align-items: center;
+  }
+  .caixa-codigo .rotulo { color: var(--texto-fraco); }
+  code {
+    font-family: var(--fonte-mono);
+    font-weight: 500;
+    color: var(--texto);
+    overflow-wrap: anywhere;
+  }
+
+  .dica {
+    padding: 14px 16px;
     display: flex;
     gap: 12px;
-    justify-content: center;
+    align-items: flex-start;
+    background: var(--painel-2);
+    border: 1px solid var(--borda-2);
+    border-radius: 10px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--texto-2);
+  }
+  .dica svg { margin-top: 2px; }
+
+  .campo {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .campo label { font-weight: 600; font-size: 14px; }
+  .campo input {
+    height: 46px;
+    padding: 0 14px;
+    background: var(--bg);
+    border: 2px solid var(--borda-2);
+    border-radius: 10px;
+    color: var(--texto);
+    font: 500 15px var(--fonte);
+    outline: none;
+  }
+  .campo input:focus { border-color: var(--destaque); }
+  .campo-ajuda { font-size: 13px; color: var(--texto-fraco); }
+  .campo-ajuda.erro { color: #F28B8E; }
+  .modal-status {
+    font-size: 14px;
+    color: var(--texto-fraco);
+  }
+  .modal-status.erro { color: #F28B8E; }
+  .modal-acoes {
+    display: flex;
     flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 10px;
   }
-  .quick-controls button {
-    background: #2e2e33;
-    border: none;
-    color: #e8e8ea;
-    padding: 10px 20px;
-    border-radius: 6px;
-    font-size: 0.9rem;
-    cursor: pointer;
+
+  /* ===== Telas pequenas ===== */
+  @media (max-width: 820px) {
+    .conteudo { flex-direction: column; flex-wrap: nowrap; }
+    .principal { flex: 1 0 auto; }
+    .lateral {
+      flex: none;
+      max-width: none;
+      border-right: none;
+      border-bottom: 1px solid var(--borda);
+      padding: 12px 6px;
+    }
   }
-  .quick-controls button:hover { background: #3a3a40; }
-  .quick-controls button:disabled {
-    background: #1a1a1d;
-    color: #6a6a70;
-    cursor: not-allowed;
+  @media (max-width: 700px) {
+    .topo { padding: 0 16px; gap: 8px; }
+    .topo .botao { padding: 0 12px; }
+    .rotulo-longo { display: none; }
+    .principal { padding: 16px; }
+    .player { border-radius: 10px; }
+    .info-numeros { align-items: flex-start; }
+    .fundo-modal { padding: 16px; }
+    .modal, .modal-estreito { padding: 20px; margin-top: 0; }
   }
-  .quick-controls button.stop {
-    background: #dc2626;
-  }
-  .quick-controls button.stop:hover { background: #b91c1c; }
-  .quick-info {
-    margin-top: 12px;
-    font-size: 0.8rem;
-    color: #8a8a90;
+  @media (max-width: 400px) {
+    .rotulo-ajuda { display: none; }
+    .player-msg svg { display: none; }
+    .marca-nome { font-size: 18px; }
   }
 </style>
 </head>
 <body>
 
-<h1>Transmissão</h1>
+<header class="topo">
+  <a class="marca" href="/">
+    <span class="marca-icone">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#141414" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2.5"/><path d="M7.8 7.8a6 6 0 0 0 0 8.4"/><path d="M16.2 16.2a6 6 0 0 0 0-8.4"/><path d="M4.9 4.9a10 10 0 0 0 0 14.2"/><path d="M19.1 19.1a10 10 0 0 0 0-14.2"/></svg>
+    </span>
+    <span class="marca-nome">ChampLive</span>
+  </a>
+  <div class="espaco"></div>
+  <button type="button" class="botao botao-contorno" onclick="abrirModal('modalAjuda')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
+    <span class="rotulo-ajuda">Ajuda</span>
+  </button>
+  <button type="button" class="botao botao-destaque" id="toggleQuick" onclick="clicarTransmitir()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/></svg>
+    Transmitir
+  </button>
+</header>
 
-<button class="toggle-btn" id="toggleQuick" onclick="toggleQuickPanel()">Transmissão Rápida</button>
+<div class="conteudo">
 
-<div class="quick-panel" id="quickPanel">
-  <h2>Transmissão Rápida (via navegador)</h2>
-  <div class="quick-controls">
-    <button id="btnStart" onclick="iniciarTransmissao()">Iniciar Transmissão</button>
-    <button id="btnStop" class="stop" onclick="pararTransmissao()" disabled>Parar Transmissão</button>
-  </div>
-  <div class="quick-info" id="quickStatus">Escolha uma tela ou janela para compartilhar direto pelo navegador.</div>
+  <aside class="lateral">
+    <div class="lateral-titulo">Ao vivo agora</div>
+    <div class="lives" id="livesMenu"></div>
+  </aside>
+
+  <main class="principal">
+
+    <div class="player" id="player">
+      <video id="video" autoplay muted playsinline></video>
+
+      <div class="player-msg">
+        <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/></svg>
+        <span class="player-msg-titulo" id="playerTitulo">Tela compartilhada de caio</span>
+        <span class="player-msg-texto" id="status">conectando...</span>
+      </div>
+
+      <div class="player-selos">
+        <span class="selo selo-vivo">AO VIVO</span>
+        <span class="selo selo-viewers" aria-label="pessoas assistindo">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>
+          <span id="seloViewers">--</span>
+        </span>
+      </div>
+
+      <div class="controles">
+        <button type="button" class="controle" id="btnPausar" aria-label="Pausar">
+          <svg id="iconePausar" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M8 5v14"/><path d="M16 5v14"/></svg>
+          <svg id="iconeTocar" hidden width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l12-7.5z"/></svg>
+        </button>
+        <button type="button" class="controle" id="btnSom" aria-label="Ativar som">
+          <svg id="iconeMudo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6"/><path d="M17 9l6 6"/></svg>
+          <svg id="iconeSom" hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+        </button>
+        <button type="button" class="aviso-som" id="avisoSom">Som desativado — clique para ouvir</button>
+        <div class="espaco"></div>
+        <button type="button" class="controle" id="btnTelaCheia" aria-label="Tela cheia">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/><path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="aviso-hls" id="avisoHls">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-top: 2px" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      <span>
+        Seu navegador não conseguiu decodificar o vídeo em tempo real (provavelmente por falta de aceleração de hardware),
+        então esta live está tocando em modo de compatibilidade, com uns 3 a 4 segundos de atraso.
+      </span>
+    </div>
+
+    <div class="info" id="info">
+      <span class="avatar" id="infoAvatar">C</span>
+      <div class="info-textos">
+        <h1 id="infoNome">caio</h1>
+        <div class="chips" id="infoChips"></div>
+      </div>
+      <div class="info-numeros">
+        <span class="info-viewers"><span class="ponto-vivo"></span><span id="viewers">-- assistindo</span></span>
+        <span class="info-tempo" id="infoTempo"></span>
+      </div>
+    </div>
+
+  </main>
 </div>
 
-<div class="lives-menu" id="livesMenu"></div>
-<div class="status" id="status">conectando...</div>
-<div class="viewers" id="viewers">👁 -- assistindo</div>
-<div class="aviso-hls" id="avisoHls">
-  Seu navegador não conseguiu decodificar o vídeo em tempo real (provavelmente por falta de aceleração de hardware),
-  então esta live está tocando em modo de compatibilidade, com uns 3 a 4 segundos de atraso.
-</div>
-<video id="video" controls autoplay muted playsinline></video>
+<!-- ===== Janela: como fazer uma live ===== -->
+<div class="fundo-modal" id="modalAjuda" hidden>
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="ajudaTitulo">
+    <div class="modal-topo">
+      <div>
+        <h2 id="ajudaTitulo">Como fazer uma live</h2>
+        <p>Escolha como você quer transmitir. Sua live aparece para todo mundo em "Ao vivo agora".</p>
+      </div>
+      <button type="button" class="fechar" aria-label="Fechar ajuda" onclick="fecharModal('modalAjuda')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
 
-<div class="config">
-  Servidor: champlive.duckdns.org — clique numa live acima para assistir
+    <div class="abas" role="tablist">
+      <button type="button" class="aba" role="tab" id="abaNavegador" aria-selected="true" aria-controls="passosNavegador" onclick="mostrarAba('navegador')">
+        <strong>Pelo navegador</strong>
+        <span>Rápido, sem instalar nada</span>
+      </button>
+      <button type="button" class="aba" role="tab" id="abaObs" aria-selected="false" aria-controls="passosObs" onclick="mostrarAba('obs')">
+        <strong>Pelo OBS</strong>
+        <span>Melhor qualidade e som</span>
+      </button>
+    </div>
+
+    <ol class="passos" id="passosNavegador" role="tabpanel" aria-labelledby="abaNavegador">
+      <li><div><strong>Clique em Transmitir</strong><span>O botão amarelo no canto superior direito.</span></div></li>
+      <li><div><strong>Dê um nome para a live</strong><span>É esse nome que seus amigos vão ver na lista.</span></div></li>
+      <li><div><strong>Escolha o que compartilhar</strong><span>Tela inteira, uma janela ou uma aba. Para levar o som, marque "Compartilhar áudio" na janela do navegador — funciona melhor compartilhando uma aba.</span></div></li>
+      <li><div><strong>Você está ao vivo</strong><span>Para encerrar, clique em Parar ou em "Parar de compartilhar" na barra do navegador.</span></div></li>
+    </ol>
+
+    <ol class="passos" id="passosObs" role="tabpanel" aria-labelledby="abaObs" hidden>
+      <li><div><strong>Configure o destino</strong><span>Em Configurações → Transmissão, escolha o serviço Personalizado.</span></div></li>
+      <li>
+        <div>
+          <strong>Cole o servidor e a chave</strong>
+          <div class="caixa-codigo grade">
+            <span class="rotulo">Servidor</span><code>rtmp://144.22.199.64:1935/live</code>
+            <span class="rotulo">Chave</span><code>seu nome (ex.: caio)</code>
+          </div>
+        </div>
+      </li>
+      <li>
+        <div>
+          <strong>Ajuste a saída de vídeo</strong>
+          <span>Em Saída (modo Avançado): codificador H264, perfil main, intervalo de keyframe 2 s. Nas opções do x264, cole:</span>
+          <code class="caixa-codigo">bframes=0 repeat_headers=1</code>
+        </div>
+      </li>
+      <li><div><strong>Inicie a transmissão</strong><span>Sua live aparece na lista em alguns segundos.</span></div></li>
+    </ol>
+
+    <div class="dica">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5B83D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+      <span>Alguém vê a tela carregando sem parar? Peça para ativar a aceleração de hardware nas configurações do navegador.</span>
+    </div>
+  </section>
+</div>
+
+<!-- ===== Janela: transmitir agora (Transmissão Rápida) ===== -->
+<div class="fundo-modal" id="quickPanel" hidden>
+  <section class="modal modal-estreito" role="dialog" aria-modal="true" aria-labelledby="transmitirTitulo">
+    <div class="modal-topo">
+      <div>
+        <h2 id="transmitirTitulo">Transmitir agora</h2>
+        <p>Compartilhe sua tela direto do navegador.</p>
+      </div>
+      <button type="button" class="fechar" aria-label="Fechar" onclick="fecharModal('quickPanel')">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <form class="campo" id="formTransmitir" onsubmit="event.preventDefault(); iniciarTransmissao();">
+      <label for="nomeLive">Nome da live</label>
+      <input id="nomeLive" type="text" autocomplete="off" maxlength="60" placeholder="ex.: jogo com galera">
+      <span class="campo-ajuda" id="nomePreview">Use letras e números. Espaços viram hífen.</span>
+    </form>
+
+    <div class="dica">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F5B83D" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
+      <span>Quer levar o som? Na próxima janela, marque "Compartilhar áudio".</span>
+    </div>
+
+    <div class="modal-status" id="quickStatus" hidden></div>
+
+    <div class="modal-acoes">
+      <button type="button" class="botao botao-contorno botao-alto" onclick="fecharModal('quickPanel')">Cancelar</button>
+      <button type="submit" form="formTransmitir" class="botao botao-destaque botao-alto" id="btnStart">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 18v3"/></svg>
+        Escolher tela e começar
+      </button>
+    </div>
+  </section>
 </div>
 
 <script>
   // ===== PLAYER (assistir lives) =====
   const video = document.getElementById('video');
+  const playerEl = document.getElementById('player');
   const statusEl = document.getElementById('status');
+  const playerTituloEl = document.getElementById('playerTitulo');
   const viewersEl = document.getElementById('viewers');
+  const seloViewersEl = document.getElementById('seloViewers');
   const menuEl = document.getElementById('livesMenu');
   const avisoHlsEl = document.getElementById('avisoHls');
+  const infoEl = document.getElementById('info');
+  const infoAvatarEl = document.getElementById('infoAvatar');
+  const infoNomeEl = document.getElementById('infoNome');
+  const infoChipsEl = document.getElementById('infoChips');
+  const infoTempoEl = document.getElementById('infoTempo');
   let pc = null;
   let hls = null;
   let reconnectTimer = null;
@@ -215,9 +849,14 @@
   // Tempo que o WebRTC tem para decodificar o primeiro quadro antes do fallback
   const DECODE_TIMEOUT_MS = 6000;
 
+  // cls: 'live' (WebRTC tocando), 'recording' (HLS tocando), 'error' ou vazio
   function setStatus(text, cls) {
     statusEl.textContent = text;
-    statusEl.className = 'status ' + (cls || '');
+    statusEl.className = 'player-msg-texto ' + (cls || '');
+    const aoVivo = cls === 'live' || cls === 'recording';
+    playerEl.classList.toggle('ao-vivo', aoVivo);
+    infoEl.classList.toggle('ao-vivo', aoVivo);
+    atualizarInfo();
   }
 
   function nomeDaLive() {
@@ -237,6 +876,8 @@
     if (pathOverride && pathOverride !== STREAM_PATH) {
       STREAM_PATH = pathOverride;
       modoHls = false; // outra live pode usar outro codec, então tenta WebRTC de novo
+      fpsAtual = null;
+      renderizarLives();
     }
     pararPlayer();
     avisoHlsEl.classList.toggle('visivel', modoHls);
@@ -423,96 +1064,356 @@
     }, 5000);
   }
 
+  // --- Controles do player ---
+  const btnPausar = document.getElementById('btnPausar');
+  const btnSom = document.getElementById('btnSom');
+  const avisoSom = document.getElementById('avisoSom');
+  const btnTelaCheia = document.getElementById('btnTelaCheia');
+
+  function atualizarControles() {
+    const pausado = video.paused;
+    document.getElementById('iconePausar').hidden = pausado;
+    document.getElementById('iconeTocar').hidden = !pausado;
+    btnPausar.setAttribute('aria-label', pausado ? 'Tocar' : 'Pausar');
+    const mudo = video.muted;
+    document.getElementById('iconeMudo').hidden = !mudo;
+    document.getElementById('iconeSom').hidden = mudo;
+    btnSom.setAttribute('aria-label', mudo ? 'Ativar som' : 'Desativar som');
+    avisoSom.hidden = !mudo;
+  }
+
+  btnPausar.onclick = () => {
+    if (video.paused) video.play().catch(() => {});
+    else video.pause();
+  };
+  function alternarSom() {
+    video.muted = !video.muted;
+    if (!video.muted && video.paused) video.play().catch(() => {});
+  }
+  btnSom.onclick = alternarSom;
+  avisoSom.onclick = alternarSom;
+
+  function alternarTelaCheia() {
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else if (playerEl.requestFullscreen) {
+      playerEl.requestFullscreen().catch(() => {});
+    } else if (playerEl.webkitRequestFullscreen) {
+      playerEl.webkitRequestFullscreen();
+    } else if (video.webkitEnterFullscreen) {
+      video.webkitEnterFullscreen(); // iPhone só deixa o <video> em tela cheia
+    }
+  }
+  btnTelaCheia.onclick = alternarTelaCheia;
+  video.addEventListener('dblclick', alternarTelaCheia);
+  ['play', 'pause', 'volumechange'].forEach(ev => video.addEventListener(ev, atualizarControles));
+
+  // esconde os controles quando o mouse fica parado sobre o vídeo tocando
+  let ociosoTimer = null;
+  function acordarControles() {
+    playerEl.classList.remove('ocioso');
+    clearTimeout(ociosoTimer);
+    ociosoTimer = setTimeout(() => {
+      if (!video.paused && playerEl.classList.contains('ao-vivo')) playerEl.classList.add('ocioso');
+    }, 3000);
+  }
+  playerEl.addEventListener('mousemove', acordarControles);
+  playerEl.addEventListener('touchstart', acordarControles, { passive: true });
+  playerEl.addEventListener('mouseleave', () => {
+    if (!video.paused && playerEl.classList.contains('ao-vivo')) playerEl.classList.add('ocioso');
+  });
+  atualizarControles();
+
   // --- Menu de lives + contador de viewers ---
   // Consulta a API do MediaMTX via proxy reverso do Apache (/api/paths),
   // evitando expor a porta 9997 diretamente para a internet.
+
+  const CORES_AVATAR = ['#F5B83D', '#60A5FA', '#F472B6', '#4ADE80', '#A78BFA', '#FB923C'];
+  let ultimosPaths = [];   // último resultado da API
+  let apiOk = false;
+  let fpsAtual = null;
+
+  function corDoNome(nome) {
+    let h = 0;
+    for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+    return CORES_AVATAR[h % CORES_AVATAR.length];
+  }
+
+  // OBS publica por RTMP; a Transmissão Rápida publica por WebRTC (WHIP)
+  function origemDaLive(p) {
+    const tipo = (p && p.source && p.source.type) || '';
+    if (tipo.startsWith('rtmp')) return 'OBS';
+    if (tipo.startsWith('webRTC')) return 'Navegador';
+    return 'Ao vivo';
+  }
+
+  function tempoAoVivo(readyTime) {
+    if (!readyTime) return '';
+    const min = Math.floor((Date.now() - new Date(readyTime).getTime()) / 60000);
+    if (isNaN(min)) return '';
+    if (min < 1) return 'ao vivo agora mesmo';
+    if (min < 60) return 'ao vivo há ' + min + ' min';
+    const h = Math.floor(min / 60);
+    return 'ao vivo há ' + h + ' h' + (min % 60 ? ' ' + (min % 60) + ' min' : '');
+  }
+
+  function renderizarLives() {
+    // só entram no menu paths que têm alguém publicando (source ativo)
+    const ativos = ultimosPaths.filter(p => p.ready);
+    menuEl.innerHTML = '';
+
+    if (ativos.length === 0) {
+      const vazio = document.createElement('div');
+      vazio.className = 'lives-vazio';
+      vazio.append(apiOk ? 'Nenhuma live ativa no momento. ' : 'Não deu para carregar a lista de lives. ');
+      if (apiOk) {
+        const link = document.createElement('button');
+        link.type = 'button';
+        link.textContent = 'Como fazer uma live';
+        link.onclick = () => abrirModal('modalAjuda');
+        vazio.append(link);
+      }
+      menuEl.appendChild(vazio);
+      return;
+    }
+
+    ativos.forEach(p => {
+      const nome = p.name.replace(/^live\//, ''); // mostra só "caio", não "live/caio"
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'live-item' + (p.name === STREAM_PATH ? ' ativa' : '');
+      if (p.name === STREAM_PATH) btn.setAttribute('aria-current', 'true');
+
+      const avatar = document.createElement('span');
+      avatar.className = 'avatar';
+      avatar.style.background = corDoNome(nome);
+      avatar.textContent = nome.charAt(0).toUpperCase();
+
+      const textos = document.createElement('span');
+      textos.className = 'live-textos';
+      const nomeEl = document.createElement('span');
+      nomeEl.className = 'live-nome';
+      nomeEl.textContent = nome;
+      const origemEl = document.createElement('span');
+      origemEl.className = 'live-origem';
+      origemEl.textContent = origemDaLive(p);
+      textos.append(nomeEl, origemEl);
+
+      const viewers = document.createElement('span');
+      viewers.className = 'live-viewers';
+      viewers.title = 'pessoas assistindo';
+      viewers.innerHTML = '<span class="ponto-vivo"></span>';
+      viewers.append(String((p.readers || []).length));
+
+      btn.append(avatar, textos, viewers);
+      btn.onclick = () => {
+        if (p.name !== STREAM_PATH) {
+          conectar(p.name);
+        }
+      };
+      menuEl.appendChild(btn);
+    });
+  }
+
+  function criarChip(texto, extra) {
+    const chip = document.createElement('span');
+    chip.className = 'chip' + (extra ? ' ' + extra : '');
+    chip.textContent = texto;
+    return chip;
+  }
+
+  // Atualiza o bloco abaixo do player (nome, chips, viewers, tempo no ar)
+  function atualizarInfo() {
+    const nome = nomeDaLive();
+    const atual = ultimosPaths.find(p => p.name === STREAM_PATH);
+    const aoVivo = playerEl.classList.contains('ao-vivo');
+
+    infoNomeEl.textContent = nome;
+    infoAvatarEl.textContent = nome.charAt(0).toUpperCase();
+    infoAvatarEl.style.background = corDoNome(nome);
+    document.title = (atual && atual.ready ? nome + ' · ' : '') + 'ChampLive';
+
+    if (!aoVivo) {
+      playerTituloEl.textContent = (apiOk && !(atual && atual.ready))
+        ? nome + ' não está ao vivo agora'
+        : 'Tela compartilhada de ' + nome;
+    }
+
+    infoChipsEl.innerHTML = '';
+    if (atual && atual.ready) {
+      const origem = origemDaLive(atual);
+      infoChipsEl.append(criarChip(origem === 'Navegador' ? 'via navegador' : origem === 'OBS' ? 'via OBS' : 'ao vivo'));
+      if (aoVivo) {
+        infoChipsEl.append(modoHls
+          ? criarChip('Modo compatibilidade', 'chip-amarelo')
+          : criarChip('Baixa latência'));
+        if (video.videoHeight) {
+          infoChipsEl.append(criarChip(video.videoHeight + 'p' + (fpsAtual ? Math.round(fpsAtual) : '')));
+        }
+      }
+    }
+
+    if (!apiOk) {
+      viewersEl.textContent = '-- assistindo';
+      seloViewersEl.textContent = '--';
+      infoTempoEl.textContent = '';
+    } else if (atual) {
+      const count = (atual.readers || []).length;
+      viewersEl.textContent = count + ' assistindo';
+      seloViewersEl.textContent = count;
+      infoTempoEl.textContent = atual.ready ? tempoAoVivo(atual.readyTime) : '';
+    } else {
+      viewersEl.textContent = 'stream offline';
+      seloViewersEl.textContent = '0';
+      infoTempoEl.textContent = '';
+    }
+  }
+
+  // fps real do WebRTC, para o chip de qualidade (ex.: 1080p60)
+  async function medirFps() {
+    if (!pc || modoHls) { fpsAtual = null; return; }
+    try {
+      const stats = await pc.getStats();
+      stats.forEach(r => {
+        if (r.type === 'inbound-rtp' && r.kind === 'video' && r.framesPerSecond) fpsAtual = r.framesPerSecond;
+      });
+    } catch (err) { /* sem stats, sem fps */ }
+  }
 
   async function atualizarLives() {
     try {
       const res = await fetch('/api/paths', { cache: 'no-store' });
       if (!res.ok) throw new Error('status ' + res.status);
       const data = await res.json();
-
-      // só entram no menu paths que têm alguém publicando (source ativo)
-      const ativos = (data.items || []).filter(p => p.ready);
-
-      if (ativos.length === 0) {
-        menuEl.innerHTML = '<div class="empty">Nenhuma live ativa no momento</div>';
-      } else {
-        menuEl.innerHTML = '';
-        ativos.forEach(p => {
-          const btn = document.createElement('button');
-          const nome = p.name.replace(/^live\//, ''); // mostra só "caio", não "live/caio"
-          btn.className = p.name === STREAM_PATH ? 'active' : '';
-          btn.innerHTML = '<span class="dot"></span>' + nome;
-          btn.onclick = () => {
-            if (p.name !== STREAM_PATH) {
-              conectar(p.name);
-            }
-          };
-          menuEl.appendChild(btn);
-        });
-      }
-
-      // atualiza contador de viewers da live atual
-      const atual = (data.items || []).find(p => p.name === STREAM_PATH);
-      if (atual) {
-        const count = (atual.readers || []).length;
-        viewersEl.textContent = '👁 ' + count + ' assistindo';
-      } else {
-        viewersEl.textContent = '👁 stream offline';
-      }
+      ultimosPaths = data.items || [];
+      apiOk = true;
     } catch (err) {
-      viewersEl.textContent = '👁 -- assistindo';
+      ultimosPaths = [];
+      apiOk = false;
     }
+    await medirFps();
+    renderizarLives();
+    atualizarInfo();
   }
+
+  video.addEventListener('resize', atualizarInfo);
+  video.addEventListener('loadedmetadata', atualizarInfo);
 
   atualizarLives();
   setInterval(atualizarLives, 4000);
 
   conectar();
 
+  // ===== JANELAS (ajuda e transmitir) =====
+  function abrirModal(id) {
+    const el = document.getElementById(id);
+    el.hidden = false;
+    const foco = el.querySelector('input') || el.querySelector('.fechar');
+    if (foco) foco.focus();
+  }
+
+  function fecharModal(id) {
+    document.getElementById(id).hidden = true;
+  }
+
+  document.querySelectorAll('.fundo-modal').forEach(fundo => {
+    fundo.addEventListener('mousedown', (e) => {
+      if (e.target === fundo) fecharModal(fundo.id);
+    });
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('.fundo-modal:not([hidden])').forEach(m => fecharModal(m.id));
+  });
+
+  function mostrarAba(qual) {
+    const navegador = qual === 'navegador';
+    document.getElementById('abaNavegador').setAttribute('aria-selected', String(navegador));
+    document.getElementById('abaObs').setAttribute('aria-selected', String(!navegador));
+    document.getElementById('passosNavegador').hidden = !navegador;
+    document.getElementById('passosObs').hidden = navegador;
+  }
+
   // ===== TRANSMISSÃO RÁPIDA (getDisplayMedia) =====
-  const quickPanel = document.getElementById('quickPanel');
   const toggleQuickBtn = document.getElementById('toggleQuick');
   const btnStart = document.getElementById('btnStart');
-  const btnStop = document.getElementById('btnStop');
   const quickStatus = document.getElementById('quickStatus');
+  const nomeLiveInput = document.getElementById('nomeLive');
+  const nomePreview = document.getElementById('nomePreview');
+  const TEXTO_BOTAO_TRANSMITIR = toggleQuickBtn.innerHTML;
 
   let quickPc = null;
   let localStream = null;
   let QUICK_STREAM_PATH = 'live/rapida';
-  let quickViewersInterval = null;
 
-  function toggleQuickPanel() {
-    quickPanel.classList.toggle('open');
-    toggleQuickBtn.classList.toggle('active');
+  function normalizarNome(nome) {
+    return nome.trim().toLowerCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '') // remove acentos
+      .replace(/[^a-z0-9-]+/g, '-') // só letras, números e hífen
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 
-  function setQuickStatus(text) {
+  // Botão do topo: abre a janela, ou encerra se já estiver transmitindo
+  function clicarTransmitir() {
+    if (quickPc) {
+      pararTransmissao();
+    } else {
+      setQuickStatus('');
+      abrirModal('quickPanel');
+    }
+  }
+
+  // mostra como o nome vai aparecer na lista
+  nomeLiveInput.addEventListener('input', () => {
+    const nome = normalizarNome(nomeLiveInput.value);
+    nomePreview.className = 'campo-ajuda';
+    nomePreview.textContent = '';
+    if (nome) {
+      nomePreview.append('Vai aparecer como ');
+      const code = document.createElement('code');
+      code.textContent = nome;
+      nomePreview.append(code, ' na lista de lives.');
+    } else {
+      nomePreview.textContent = 'Use letras e números. Espaços viram hífen.';
+    }
+  });
+
+  function setQuickStatus(text, erro) {
     quickStatus.textContent = text;
+    quickStatus.hidden = !text;
+    quickStatus.className = 'modal-status' + (erro ? ' erro' : '');
+  }
+
+  function atualizarBotaoTransmitir(nome) {
+    if (nome) {
+      toggleQuickBtn.className = 'botao botao-parar';
+      toggleQuickBtn.innerHTML = '<span class="ponto-pulsando"></span><span>Ao vivo<span class="rotulo-longo"></span> · Parar</span>';
+      toggleQuickBtn.querySelector('.rotulo-longo').textContent = ' como ' + nome;
+      toggleQuickBtn.title = 'Parar a transmissão';
+    } else {
+      toggleQuickBtn.className = 'botao botao-destaque';
+      toggleQuickBtn.innerHTML = TEXTO_BOTAO_TRANSMITIR;
+      toggleQuickBtn.title = '';
+    }
   }
 
   async function iniciarTransmissao() {
+    if (quickPc || localStream) return;
     try {
-      // Pergunta o nome da transmissão antes de tudo
-      let nome = prompt('Nome da sua transmissão (aparecerá no menu de lives):', '');
-      if (nome === null) return; // usuário cancelou o prompt
-
-      nome = nome.trim().toLowerCase()
-        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
-        .replace(/[^a-z0-9-]+/g, '-') // só letras, números e hífen
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '');
+      const nome = normalizarNome(nomeLiveInput.value);
 
       if (!nome) {
-        setQuickStatus('nome inválido — tente novamente');
+        nomePreview.className = 'campo-ajuda erro';
+        nomePreview.textContent = 'Dê um nome para a live (letras e números).';
+        nomeLiveInput.focus();
         return;
       }
 
       QUICK_STREAM_PATH = 'live/' + nome;
 
-      setQuickStatus('escolha a tela...');
+      setQuickStatus('Escolha a tela, janela ou aba na janela do navegador...');
+      btnStart.disabled = true;
 
       localStream = await navigator.mediaDevices.getDisplayMedia({
         video: {
@@ -523,21 +1424,27 @@
         audio: true
       });
 
-      setQuickStatus('conectando...');
+      // "Parar de compartilhar" na barra do navegador encerra a live
+      localStream.getVideoTracks().forEach(track => {
+        track.addEventListener('ended', () => pararTransmissao());
+      });
+
+      setQuickStatus('Conectando...');
 
       quickPc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
+      const meuQuickPc = quickPc;
 
       localStream.getTracks().forEach(track => {
         quickPc.addTrack(track, localStream);
       });
 
       quickPc.oniceconnectionstatechange = () => {
+        if (meuQuickPc !== quickPc) return;
         if (quickPc.iceConnectionState === 'connected' || quickPc.iceConnectionState === 'completed') {
-          setQuickStatus('ao vivo — transmitindo como "' + nome + '"');
+          setQuickStatus('Ao vivo, transmitindo como "' + nome + '".');
         } else if (['disconnected', 'failed', 'closed'].includes(quickPc.iceConnectionState)) {
-          setQuickStatus('transmissão encerrada');
           pararTransmissao();
         }
       };
@@ -570,17 +1477,19 @@
       const answerSdp = await response.text();
       await quickPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
-      btnStart.disabled = true;
-      btnStop.disabled = false;
+      btnStart.disabled = false;
+      atualizarBotaoTransmitir(nome);
+      fecharModal('quickPanel');
+      atualizarLives();
 
     } catch (err) {
       console.error(err);
-      if (err.name === 'NotAllowedError') {
-        setQuickStatus('você cancelou a captura de tela');
-      } else {
-        setQuickStatus('erro: ' + err.message);
-      }
       pararTransmissao();
+      if (err.name === 'NotAllowedError') {
+        setQuickStatus('Você cancelou a captura de tela.', true);
+      } else {
+        setQuickStatus('Erro: ' + err.message, true);
+      }
     }
   }
 
@@ -593,14 +1502,10 @@
       quickPc.close();
       quickPc = null;
     }
-    if (quickViewersInterval) {
-      clearInterval(quickViewersInterval);
-      quickViewersInterval = null;
-    }
 
     btnStart.disabled = false;
-    btnStop.disabled = true;
-    setQuickStatus('Escolha uma tela ou janela para compartilhar direto pelo navegador.');
+    atualizarBotaoTransmitir(null);
+    setQuickStatus('');
   }
 
   window.addEventListener('beforeunload', () => {
