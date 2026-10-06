@@ -266,6 +266,7 @@
       const meuPc = pc;
 
       meuPc.ontrack = (event) => {
+        if (minhaSessao !== sessao) return;
         if (video.srcObject !== event.streams[0]) {
           video.srcObject = event.streams[0];
           video.play().catch(() => {});
@@ -374,8 +375,8 @@
   }
 
   async function conectarHls(minhaSessao) {
-    // /hls aponta para a porta 8888 do MediaMTX pelo proxy do Apache
-    const url = '/hls/live/' + nomeDaLive() + '/index.m3u8';
+    // o Apache manda os .m3u8/.mp4 de /live para a porta 8888 (HLS) do MediaMTX
+    const url = '/live/' + nomeDaLive() + '/index.m3u8';
     setStatus('conectando (modo compatibilidade)...');
 
     try {
@@ -392,7 +393,7 @@
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal || minhaSessao !== sessao) return;
           console.error('HLS:', data);
-          setStatus('sem sinal — tentando reconectar em 5s...', 'error');
+          setStatus('sem sinal no modo compatibilidade — tentando de novo em 5s...', 'error');
           if (hls) { hls.destroy(); hls = null; }
           agendarReconexao();
         });
@@ -409,7 +410,7 @@
     } catch (err) {
       if (minhaSessao !== sessao) return;
       console.error(err);
-      setStatus('sem sinal — tentando reconectar em 5s...', 'error');
+      setStatus('sem sinal no modo compatibilidade — tentando de novo em 5s...', 'error');
       agendarReconexao();
     }
   }
