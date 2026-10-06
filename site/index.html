@@ -336,6 +336,43 @@
     min-width: 0;
   }
   .aviso-som:hover { color: #fff; }
+  .volume {
+    --nivel: 100%;
+    width: 96px;
+    flex: none;
+    height: 20px;
+    margin: 0 6px 0 2px;
+    background: transparent;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .volume::-webkit-slider-runnable-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #fff var(--nivel), rgba(255, 255, 255, 0.3) var(--nivel));
+  }
+  .volume::-moz-range-track {
+    height: 4px;
+    border-radius: 2px;
+    background: linear-gradient(to right, #fff var(--nivel), rgba(255, 255, 255, 0.3) var(--nivel));
+  }
+  .volume::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    margin-top: -5px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+  }
+  .volume::-moz-range-thumb {
+    width: 14px;
+    height: 14px;
+    border: none;
+    border-radius: 50%;
+    background: #fff;
+  }
 
   /* aviso amarelo do modo compatibilidade (HLS) */
   .aviso-hls {
@@ -638,6 +675,8 @@
   @media (max-width: 400px) {
     .rotulo-ajuda { display: none; }
     .player-msg svg { display: none; }
+    .volume { width: 64px; }
+    .aviso-som { display: none; }
     .marca-nome { font-size: 18px; }
   }
 </style>
@@ -697,6 +736,7 @@
           <svg id="iconeMudo" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M23 9l-6 6"/><path d="M17 9l6 6"/></svg>
           <svg id="iconeSom" hidden width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a10 10 0 0 1 0 14"/></svg>
         </button>
+        <input type="range" class="volume" id="volume" min="0" max="1" step="0.05" value="1" aria-label="Volume">
         <button type="button" class="aviso-som" id="avisoSom">Som desativado — clique para ouvir</button>
         <div class="espaco"></div>
         <button type="button" class="controle" id="btnTelaCheia" aria-label="Tela cheia">
@@ -845,6 +885,7 @@
   let sessao = 0;     // invalida callbacks de conexões antigas
   let modoHls = false; // true quando o WebRTC falhou por codec nesta live
   let STREAM_PATH = 'live/caio'; // live padrão ao abrir a página
+  let escolheuLive = false;      // vira true quando alguém clica numa live
 
   // Tempo que o WebRTC tem para decodificar o primeiro quadro antes do fallback
   const DECODE_TIMEOUT_MS = 6000;
@@ -895,6 +936,35 @@
     conectar();
   }
 
+  // Esperar o ICE gathering chegar a 'complete' pode levar 10 s ou mais quando o
+  // PC tem várias placas de rede (VPN, Hyper-V, Wi-Fi + cabo): o navegador espera
+  // o STUN responder ou estourar o tempo em cada uma. Como o servidor tem IP
+  // público, basta o candidato do STUN (srflx) ou até os locais: o MediaMTX
+  // descobre o endereço real pelas próprias verificações de conectividade.
+  // Então manda a oferta assim que chega o srflx, ou depois de no máximo 1,5 s.
+  const ICE_ESPERA_MAX_MS = 1500;
+  function esperarCandidatos(conexao) {
+    return new Promise((resolve) => {
+      if (conexao.iceGatheringState === 'complete') return resolve();
+      let feito = false;
+      const terminar = () => {
+        if (feito) return;
+        feito = true;
+        clearTimeout(limite);
+        conexao.removeEventListener('icegatheringstatechange', aoMudar);
+        conexao.removeEventListener('icecandidate', aoCandidato);
+        resolve();
+      };
+      const aoMudar = () => { if (conexao.iceGatheringState === 'complete') terminar(); };
+      const aoCandidato = (e) => {
+        if (e.candidate && e.candidate.type === 'srflx') setTimeout(terminar, 100);
+      };
+      const limite = setTimeout(terminar, ICE_ESPERA_MAX_MS);
+      conexao.addEventListener('icegatheringstatechange', aoMudar);
+      conexao.addEventListener('icecandidate', aoCandidato);
+    });
+  }
+
   async function conectarWebrtc(minhaSessao) {
     const url = '/live/' + nomeDaLive() + '/whep';
 
@@ -932,17 +1002,8 @@
       const offer = await meuPc.createOffer();
       await meuPc.setLocalDescription(offer);
 
-      // espera o ICE gathering terminar (não usamos trickle ICE aqui, é mais simples)
-      await new Promise((resolve) => {
-        if (meuPc.iceGatheringState === 'complete') return resolve();
-        const check = () => {
-          if (meuPc.iceGatheringState === 'complete') {
-            meuPc.removeEventListener('icegatheringstatechange', check);
-            resolve();
-          }
-        };
-        meuPc.addEventListener('icegatheringstatechange', check);
-      });
+      // não usamos trickle ICE: espera os candidatos antes de mandar a oferta
+      await esperarCandidatos(meuPc);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -1068,18 +1129,23 @@
   const btnPausar = document.getElementById('btnPausar');
   const btnSom = document.getElementById('btnSom');
   const avisoSom = document.getElementById('avisoSom');
+  const volumeEl = document.getElementById('volume');
   const btnTelaCheia = document.getElementById('btnTelaCheia');
 
   function atualizarControles() {
     const pausado = video.paused;
-    document.getElementById('iconePausar').hidden = pausado;
-    document.getElementById('iconeTocar').hidden = !pausado;
+    // svg não tem a propriedade .hidden, por isso o atributo direto
+    document.getElementById('iconePausar').toggleAttribute('hidden', pausado);
+    document.getElementById('iconeTocar').toggleAttribute('hidden', !pausado);
     btnPausar.setAttribute('aria-label', pausado ? 'Tocar' : 'Pausar');
     const mudo = video.muted;
-    document.getElementById('iconeMudo').hidden = !mudo;
-    document.getElementById('iconeSom').hidden = mudo;
+    document.getElementById('iconeMudo').toggleAttribute('hidden', !mudo);
+    document.getElementById('iconeSom').toggleAttribute('hidden', mudo);
     btnSom.setAttribute('aria-label', mudo ? 'Ativar som' : 'Desativar som');
     avisoSom.hidden = !mudo;
+    const nivel = mudo ? 0 : video.volume;
+    volumeEl.value = nivel;
+    volumeEl.style.setProperty('--nivel', Math.round(nivel * 100) + '%');
   }
 
   btnPausar.onclick = () => {
@@ -1088,8 +1154,22 @@
   };
   function alternarSom() {
     video.muted = !video.muted;
+    if (!video.muted && video.volume === 0) video.volume = 0.5;
     if (!video.muted && video.paused) video.play().catch(() => {});
   }
+
+  // volume: arrastar a barra também tira do mudo; o nível fica salvo no navegador
+  volumeEl.addEventListener('input', () => {
+    const nivel = Number(volumeEl.value);
+    video.volume = nivel;
+    video.muted = nivel === 0;
+    if (!video.muted && video.paused) video.play().catch(() => {});
+    try { localStorage.setItem('champlive-volume', String(nivel)); } catch (e) { /* sem storage */ }
+  });
+  try {
+    const salvo = parseFloat(localStorage.getItem('champlive-volume'));
+    if (salvo > 0 && salvo <= 1) video.volume = salvo;
+  } catch (e) { /* sem storage */ }
   btnSom.onclick = alternarSom;
   avisoSom.onclick = alternarSom;
 
@@ -1133,6 +1213,11 @@
   let apiOk = false;
   let fpsAtual = null;
 
+  // "ready" foi substituído por "online" nas versões novas do MediaMTX
+  function estaNoAr(p) {
+    return !!(p && (p.online || p.ready));
+  }
+
   function corDoNome(nome) {
     let h = 0;
     for (const c of nome) h = (h * 31 + c.charCodeAt(0)) >>> 0;
@@ -1141,10 +1226,10 @@
 
   // OBS publica por RTMP; a Transmissão Rápida publica por WebRTC (WHIP)
   function origemDaLive(p) {
-    const tipo = (p && p.source && p.source.type) || '';
-    if (tipo.startsWith('rtmp')) return 'OBS';
-    if (tipo.startsWith('webRTC')) return 'Navegador';
-    return 'Ao vivo';
+    const tipo = ((p && p.source && p.source.type) || '').toLowerCase();
+    if (tipo.includes('rtmp') || tipo.includes('srt')) return 'OBS';
+    if (tipo.includes('webrtc')) return 'Navegador';
+    return '';
   }
 
   function tempoAoVivo(readyTime) {
@@ -1159,7 +1244,7 @@
 
   function renderizarLives() {
     // só entram no menu paths que têm alguém publicando (source ativo)
-    const ativos = ultimosPaths.filter(p => p.ready);
+    const ativos = ultimosPaths.filter(estaNoAr);
     menuEl.innerHTML = '';
 
     if (ativos.length === 0) {
@@ -1197,7 +1282,8 @@
       const origemEl = document.createElement('span');
       origemEl.className = 'live-origem';
       origemEl.textContent = origemDaLive(p);
-      textos.append(nomeEl, origemEl);
+      textos.append(nomeEl);
+      if (origemEl.textContent) textos.append(origemEl);
 
       const viewers = document.createElement('span');
       viewers.className = 'live-viewers';
@@ -1207,6 +1293,7 @@
 
       btn.append(avatar, textos, viewers);
       btn.onclick = () => {
+        escolheuLive = true;
         if (p.name !== STREAM_PATH) {
           conectar(p.name);
         }
@@ -1231,18 +1318,18 @@
     infoNomeEl.textContent = nome;
     infoAvatarEl.textContent = nome.charAt(0).toUpperCase();
     infoAvatarEl.style.background = corDoNome(nome);
-    document.title = (atual && atual.ready ? nome + ' · ' : '') + 'ChampLive';
+    document.title = (estaNoAr(atual) ? nome + ' · ' : '') + 'ChampLive';
 
     if (!aoVivo) {
-      playerTituloEl.textContent = (apiOk && !(atual && atual.ready))
+      playerTituloEl.textContent = (apiOk && !estaNoAr(atual))
         ? nome + ' não está ao vivo agora'
         : 'Tela compartilhada de ' + nome;
     }
 
     infoChipsEl.innerHTML = '';
-    if (atual && atual.ready) {
+    if (estaNoAr(atual)) {
       const origem = origemDaLive(atual);
-      infoChipsEl.append(criarChip(origem === 'Navegador' ? 'via navegador' : origem === 'OBS' ? 'via OBS' : 'ao vivo'));
+      if (origem) infoChipsEl.append(criarChip(origem === 'Navegador' ? 'via navegador' : 'via OBS'));
       if (aoVivo) {
         infoChipsEl.append(modoHls
           ? criarChip('Modo compatibilidade', 'chip-amarelo')
@@ -1261,7 +1348,7 @@
       const count = (atual.readers || []).length;
       viewersEl.textContent = count + ' assistindo';
       seloViewersEl.textContent = count;
-      infoTempoEl.textContent = atual.ready ? tempoAoVivo(atual.readyTime) : '';
+      infoTempoEl.textContent = estaNoAr(atual) ? tempoAoVivo(atual.onlineTime || atual.readyTime) : '';
     } else {
       viewersEl.textContent = 'stream offline';
       seloViewersEl.textContent = '0';
@@ -1287,6 +1374,12 @@
       const data = await res.json();
       ultimosPaths = data.items || [];
       apiOk = true;
+      // ao abrir a página, se a live padrão não está no ar, vai para a primeira ativa
+      if (!escolheuLive) {
+        escolheuLive = true;
+        const ativos = ultimosPaths.filter(estaNoAr);
+        if (ativos.length && !ativos.some(p => p.name === STREAM_PATH)) conectar(ativos[0].name);
+      }
     } catch (err) {
       ultimosPaths = [];
       apiOk = false;
@@ -1452,16 +1545,7 @@
       const offer = await quickPc.createOffer();
       await quickPc.setLocalDescription(offer);
 
-      await new Promise((resolve) => {
-        if (quickPc.iceGatheringState === 'complete') return resolve();
-        const check = () => {
-          if (quickPc.iceGatheringState === 'complete') {
-            quickPc.removeEventListener('icegatheringstatechange', check);
-            resolve();
-          }
-        };
-        quickPc.addEventListener('icegatheringstatechange', check);
-      });
+      await esperarCandidatos(quickPc);
 
       const url = '/live/' + QUICK_STREAM_PATH.replace(/^live\//, '') + '/whip';
       const response = await fetch(url, {
