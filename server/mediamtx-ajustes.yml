@@ -1,0 +1,14 @@
+# Ajustes feitos no /etc/mediamtx.yml padrão (v1.20.0).
+# Não é o arquivo completo — só as chaves que mudamos.
+
+# API usada pelo menu de lives e contador de viewers (acessada via proxy do Apache)
+api: yes
+apiAddress: :9997
+
+# WebRTC: anunciar o IP público da VPS nos candidatos ICE
+webrtcAdditionalHosts: [144.22.199.64]
+
+# Low-Latency HLS exige no mínimo 7 segmentos
+hlsSegmentDuration: 500ms
+hlsPartDuration: 200ms
+hlsSegmentCount: 7

@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transmissão ao vivo</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: #0d0d0f;
+    color: #e8e8ea;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  h1 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 0 0 16px;
+    color: #f5f5f5;
+  }
+  .status {
+    font-size: 0.85rem;
+    color: #8a8a90;
+    margin-bottom: 16px;
+    min-height: 1.2em;
+  }
+  .status.live { color: #4ade80; }
+  .status.error { color: #f87171; }
+  .status.recording { color: #f59e0b; }
+  .viewers {
+    font-size: 0.8rem;
+    color: #a8a8ae;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lives-menu {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 20px;
+    max-width: 960px;
+  }
+  .lives-menu button {
+    background: #1a1a1d;
+    border: 1px solid #2e2e33;
+    color: #c8c8ce;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .lives-menu button:hover { background: #26262a; }
+  .lives-menu button.active {
+    background: #2d4a34;
+    border-color: #4ade80;
+    color: #e8e8ea;
+  }
+  .lives-menu button .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4ade80;
+  }
+  .lives-menu .empty {
+    font-size: 0.85rem;
+    color: #6a6a70;
+  }
+  video {
+    width: 95vw;
+    max-width: 1600px;
+    background: #000;
+    border-radius: 8px;
+    box-shadow: 0 8px 30px rgba(0,0,0,0.5);
+  }
+  .config {
+    margin-top: 20px;
+    font-size: 0.8rem;
+    color: #6a6a70;
+    text-align: center;
+  }
+  .toggle-btn {
+    background: #2e2e33;
+    border: 1px solid #3a3a40;
+    color: #e8e8ea;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-bottom: 20px;
+  }
+  .toggle-btn:hover { background: #3a3a40; }
+  .toggle-btn.active {
+    background: #dc2626;
+    border-color: #dc2626;
+  }
+  .quick-panel {
+    display: none;
+    width: 95vw;
+    max-width: 1600px;
+    background: #161618;
+    border: 1px solid #2e2e33;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+  .quick-panel.open { display: block; }
+  .quick-panel h2 {
+    font-size: 1rem;
+    margin: 0 0 12px;
+    color: #f5f5f5;
+  }
+  .quick-controls {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .quick-controls button {
+    background: #2e2e33;
+    border: none;
+    color: #e8e8ea;
+    padding: 10px 20px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    cursor: pointer;
+  }
+  .quick-controls button:hover { background: #3a3a40; }
+  .quick-controls button:disabled {
+    background: #1a1a1d;
+    color: #6a6a70;
+    cursor: not-allowed;
+  }
+  .quick-controls button.stop {
+    background: #dc2626;
+  }
+  .quick-controls button.stop:hover { background: #b91c1c; }
+  .quick-info {
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: #8a8a90;
+  }
+</style>
+</head>
+<body>
+
+<h1>Transmissão</h1>
+
+<button class="toggle-btn" id="toggleQuick" onclick="toggleQuickPanel()">Transmissão Rápida</button>
+
+<div class="quick-panel" id="quickPanel">
+  <h2>Transmissão Rápida (via navegador)</h2>
+  <div class="quick-controls">
+    <button id="btnStart" onclick="iniciarTransmissao()">Iniciar Transmissão</button>
+    <button id="btnStop" class="stop" onclick="pararTransmissao()" disabled>Parar Transmissão</button>
+  </div>
+  <div class="quick-info" id="quickStatus">Escolha uma tela ou janela para compartilhar direto pelo navegador.</div>
+</div>
+
+<div class="lives-menu" id="livesMenu"></div>
+<div class="status" id="status">conectando...</div>
+<div class="viewers" id="viewers">👁 -- assistindo</div>
+<video id="video" controls autoplay muted playsinline></video>
+
+<div class="config">
+  Servidor: champlive.duckdns.org — clique numa live acima para assistir
+</div>
+
+<script>
+  // ===== PLAYER (assistir lives) =====
+  const video = document.getElementById('video');
+  const statusEl = document.getElementById('status');
+  const viewersEl = document.getElementById('viewers');
+  const menuEl = document.getElementById('livesMenu');
+  let pc = null;
+  let reconnectTimer = null;
+  let STREAM_PATH = 'live/caio'; // live padrão ao abrir a página
+
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = 'status ' + (cls || '');
+  }
+
+  async function conectar(pathOverride) {
+    if (pathOverride) STREAM_PATH = pathOverride;
+    const url = '/live/' + STREAM_PATH.replace(/^live\//, '') + '/whep';
+
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (pc) { pc.close(); pc = null; }
+
+    setStatus('conectando...');
+
+    try {
+      pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      pc.ontrack = (event) => {
+        if (video.srcObject !== event.streams[0]) {
+          video.srcObject = event.streams[0];
+          video.play().catch(() => {});
+        }
+      };
+
+      pc.oniceconnectionstatechange = () => {
+        if (pc.iceConnectionState === 'connected') {
+          setStatus('ao vivo', 'live');
+        } else if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
+          setStatus('sem sinal — tentando reconectar em 5s...', 'error');
+          agendarReconexao();
+        }
+      };
+
+      // WHEP exige declarar que queremos receber audio/video antes da oferta
+      pc.addTransceiver('video', { direction: 'recvonly' });
+      pc.addTransceiver('audio', { direction: 'recvonly' });
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      // espera o ICE gathering terminar (não usamos trickle ICE aqui, é mais simples)
+      await new Promise((resolve) => {
+        if (pc.iceGatheringState === 'complete') return resolve();
+        const check = () => {
+          if (pc.iceGatheringState === 'complete') {
+            pc.removeEventListener('icegatheringstatechange', check);
+            resolve();
+          }
+        };
+        pc.addEventListener('icegatheringstatechange', check);
+      });
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: pc.localDescription.sdp
+      });
+
+      if (!response.ok) {
+        throw new Error('Servidor respondeu ' + response.status + ' — stream pode não estar ativo');
+      }
+
+      const answerSdp = await response.text();
+      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+    } catch (err) {
+      console.error(err);
+      setStatus('sem sinal — tentando reconectar em 5s...', 'error');
+      agendarReconexao();
+    }
+  }
+
+  function agendarReconexao() {
+    if (reconnectTimer) return;
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      conectar();
+    }, 5000);
+  }
+
+  // --- Menu de lives + contador de viewers ---
+  // Consulta a API do MediaMTX via proxy reverso do Apache (/api/paths),
+  // evitando expor a porta 9997 diretamente para a internet.
+
+  async function atualizarLives() {
+    try {
+      const res = await fetch('/api/paths', { cache: 'no-store' });
+      if (!res.ok) throw new Error('status ' + res.status);
+      const data = await res.json();
+
+      // só entram no menu paths que têm alguém publicando (source ativo)
+      const ativos = (data.items || []).filter(p => p.ready);
+
+      if (ativos.length === 0) {
+        menuEl.innerHTML = '<div class="empty">Nenhuma live ativa no momento</div>';
+      } else {
+        menuEl.innerHTML = '';
+        ativos.forEach(p => {
+          const btn = document.createElement('button');
+          const nome = p.name.replace(/^live\//, ''); // mostra só "caio", não "live/caio"
+          btn.className = p.name === STREAM_PATH ? 'active' : '';
+          btn.innerHTML = '<span class="dot"></span>' + nome;
+          btn.onclick = () => {
+            if (p.name !== STREAM_PATH) {
+              conectar(p.name);
+            }
+          };
+          menuEl.appendChild(btn);
+        });
+      }
+
+      // atualiza contador de viewers da live atual
+      const atual = (data.items || []).find(p => p.name === STREAM_PATH);
+      if (atual) {
+        const count = (atual.readers || []).length;
+        viewersEl.textContent = '👁 ' + count + ' assistindo';
+      } else {
+        viewersEl.textContent = '👁 stream offline';
+      }
+    } catch (err) {
+      viewersEl.textContent = '👁 -- assistindo';
+    }
+  }
+
+  atualizarLives();
+  setInterval(atualizarLives, 4000);
+
+  conectar();
+
+  // ===== TRANSMISSÃO RÁPIDA (getDisplayMedia) =====
+  const quickPanel = document.getElementById('quickPanel');
+  const toggleQuickBtn = document.getElementById('toggleQuick');
+  const btnStart = document.getElementById('btnStart');
+  const btnStop = document.getElementById('btnStop');
+  const quickStatus = document.getElementById('quickStatus');
+
+  let quickPc = null;
+  let localStream = null;
+  let QUICK_STREAM_PATH = 'live/rapida';
+  let quickViewersInterval = null;
+
+  function toggleQuickPanel() {
+    quickPanel.classList.toggle('open');
+    toggleQuickBtn.classList.toggle('active');
+  }
+
+  function setQuickStatus(text) {
+    quickStatus.textContent = text;
+  }
+
+  async function iniciarTransmissao() {
+    try {
+      // Pergunta o nome da transmissão antes de tudo
+      let nome = prompt('Nome da sua transmissão (aparecerá no menu de lives):', '');
+      if (nome === null) return; // usuário cancelou o prompt
+
+      nome = nome.trim().toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // remove acentos
+        .replace(/[^a-z0-9-]+/g, '-') // só letras, números e hífen
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+
+      if (!nome) {
+        setQuickStatus('nome inválido — tente novamente');
+        return;
+      }
+
+      QUICK_STREAM_PATH = 'live/' + nome;
+
+      setQuickStatus('escolha a tela...');
+
+      localStream = await navigator.mediaDevices.getDisplayMedia({
+        video: {
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 60 }
+        },
+        audio: true
+      });
+
+      setQuickStatus('conectando...');
+
+      quickPc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+
+      localStream.getTracks().forEach(track => {
+        quickPc.addTrack(track, localStream);
+      });
+
+      quickPc.oniceconnectionstatechange = () => {
+        if (quickPc.iceConnectionState === 'connected' || quickPc.iceConnectionState === 'completed') {
+          setQuickStatus('ao vivo — transmitindo como "' + nome + '"');
+        } else if (['disconnected', 'failed', 'closed'].includes(quickPc.iceConnectionState)) {
+          setQuickStatus('transmissão encerrada');
+          pararTransmissao();
+        }
+      };
+
+      const offer = await quickPc.createOffer();
+      await quickPc.setLocalDescription(offer);
+
+      await new Promise((resolve) => {
+        if (quickPc.iceGatheringState === 'complete') return resolve();
+        const check = () => {
+          if (quickPc.iceGatheringState === 'complete') {
+            quickPc.removeEventListener('icegatheringstatechange', check);
+            resolve();
+          }
+        };
+        quickPc.addEventListener('icegatheringstatechange', check);
+      });
+
+      const url = '/live/' + QUICK_STREAM_PATH.replace(/^live\//, '') + '/whip';
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/sdp' },
+        body: quickPc.localDescription.sdp
+      });
+
+      if (!response.ok) {
+        throw new Error('Servidor respondeu ' + response.status);
+      }
+
+      const answerSdp = await response.text();
+      await quickPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+
+      btnStart.disabled = true;
+      btnStop.disabled = false;
+
+    } catch (err) {
+      console.error(err);
+      if (err.name === 'NotAllowedError') {
+        setQuickStatus('você cancelou a captura de tela');
+      } else {
+        setQuickStatus('erro: ' + err.message);
+      }
+      pararTransmissao();
+    }
+  }
+
+  function pararTransmissao() {
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      localStream = null;
+    }
+    if (quickPc) {
+      quickPc.close();
+      quickPc = null;
+    }
+    if (quickViewersInterval) {
+      clearInterval(quickViewersInterval);
+      quickViewersInterval = null;
+    }
+
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+    setQuickStatus('Escolha uma tela ou janela para compartilhar direto pelo navegador.');
+  }
+
+  window.addEventListener('beforeunload', () => {
+    if (quickPc && quickPc.iceConnectionState !== 'closed') {
+      pararTransmissao();
+    }
+  });
+</script>
+
+</body>
+</html>

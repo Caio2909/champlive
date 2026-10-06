@@ -1,0 +1,12 @@
+[Unit]
+Description=MediaMTX
+After=network.target
+
+[Service]
+WorkingDirectory=/var/lib/mediamtx
+ExecStart=/usr/local/bin/mediamtx /etc/mediamtx.yml
+Restart=always
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target

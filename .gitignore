@@ -1,0 +1,4 @@
+.htdigest
+.htpasswd
+*.key
+*.crt

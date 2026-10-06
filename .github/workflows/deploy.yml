@@ -1,0 +1,31 @@
+name: Deploy no servidor
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar chave SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Enviar arquivos do site
+        run: |
+          rsync -avz --delete -e "ssh -i ~/.ssh/id_deploy" \
+            site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/champlive-site/"
+
+      - name: Publicar no Apache
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "sudo rsync -a ~/champlive-site/ /var/www/html/ && sudo chown -R www-data:www-data /var/www/html"
