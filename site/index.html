@@ -34,6 +34,19 @@
   .status.live { color: #4ade80; }
   .status.error { color: #f87171; }
   .status.recording { color: #f59e0b; }
+  .aviso-hls {
+    display: none;
+    max-width: 960px;
+    font-size: 0.8rem;
+    color: #fcd34d;
+    background: #2a2213;
+    border: 1px solid #5c4a1c;
+    border-radius: 6px;
+    padding: 8px 14px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+  .aviso-hls.visivel { display: block; }
   .viewers {
     font-size: 0.8rem;
     color: #a8a8ae;
@@ -174,6 +187,10 @@
 <div class="lives-menu" id="livesMenu"></div>
 <div class="status" id="status">conectando...</div>
 <div class="viewers" id="viewers">👁 -- assistindo</div>
+<div class="aviso-hls" id="avisoHls">
+  Seu navegador não conseguiu decodificar o vídeo em tempo real (provavelmente por falta de aceleração de hardware),
+  então esta live está tocando em modo de compatibilidade, com uns 3 a 4 segundos de atraso.
+</div>
 <video id="video" controls autoplay muted playsinline></video>
 
 <div class="config">
@@ -186,21 +203,59 @@
   const statusEl = document.getElementById('status');
   const viewersEl = document.getElementById('viewers');
   const menuEl = document.getElementById('livesMenu');
+  const avisoHlsEl = document.getElementById('avisoHls');
   let pc = null;
+  let hls = null;
   let reconnectTimer = null;
+  let decodeTimer = null;
+  let sessao = 0;     // invalida callbacks de conexões antigas
+  let modoHls = false; // true quando o WebRTC falhou por codec nesta live
   let STREAM_PATH = 'live/caio'; // live padrão ao abrir a página
+
+  // Tempo que o WebRTC tem para decodificar o primeiro quadro antes do fallback
+  const DECODE_TIMEOUT_MS = 6000;
 
   function setStatus(text, cls) {
     statusEl.textContent = text;
     statusEl.className = 'status ' + (cls || '');
   }
 
-  async function conectar(pathOverride) {
-    if (pathOverride) STREAM_PATH = pathOverride;
-    const url = '/live/' + STREAM_PATH.replace(/^live\//, '') + '/whep';
+  function nomeDaLive() {
+    return STREAM_PATH.replace(/^live\//, '');
+  }
 
+  function pararPlayer() {
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    if (decodeTimer) { clearTimeout(decodeTimer); decodeTimer = null; }
     if (pc) { pc.close(); pc = null; }
+    if (hls) { hls.destroy(); hls = null; }
+    video.srcObject = null;
+    video.removeAttribute('src');
+  }
+
+  function conectar(pathOverride) {
+    if (pathOverride && pathOverride !== STREAM_PATH) {
+      STREAM_PATH = pathOverride;
+      modoHls = false; // outra live pode usar outro codec, então tenta WebRTC de novo
+    }
+    pararPlayer();
+    avisoHlsEl.classList.toggle('visivel', modoHls);
+    const minhaSessao = ++sessao;
+    if (modoHls) {
+      conectarHls(minhaSessao);
+    } else {
+      conectarWebrtc(minhaSessao);
+    }
+  }
+
+  function ativarFallbackHls(motivo) {
+    console.warn('WebRTC sem decodificação, trocando para HLS:', motivo);
+    modoHls = true;
+    conectar();
+  }
+
+  async function conectarWebrtc(minhaSessao) {
+    const url = '/live/' + nomeDaLive() + '/whep';
 
     setStatus('conectando...');
 
@@ -208,56 +263,151 @@
       pc = new RTCPeerConnection({
         iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
       });
+      const meuPc = pc;
 
-      pc.ontrack = (event) => {
+      meuPc.ontrack = (event) => {
         if (video.srcObject !== event.streams[0]) {
           video.srcObject = event.streams[0];
           video.play().catch(() => {});
         }
       };
 
-      pc.oniceconnectionstatechange = () => {
-        if (pc.iceConnectionState === 'connected') {
+      meuPc.oniceconnectionstatechange = () => {
+        if (minhaSessao !== sessao) return;
+        if (meuPc.iceConnectionState === 'connected') {
           setStatus('ao vivo', 'live');
-        } else if (['disconnected', 'failed', 'closed'].includes(pc.iceConnectionState)) {
+          verificarDecodificacao(minhaSessao, meuPc);
+        } else if (['disconnected', 'failed', 'closed'].includes(meuPc.iceConnectionState)) {
           setStatus('sem sinal — tentando reconectar em 5s...', 'error');
           agendarReconexao();
         }
       };
 
       // WHEP exige declarar que queremos receber audio/video antes da oferta
-      pc.addTransceiver('video', { direction: 'recvonly' });
-      pc.addTransceiver('audio', { direction: 'recvonly' });
+      meuPc.addTransceiver('video', { direction: 'recvonly' });
+      meuPc.addTransceiver('audio', { direction: 'recvonly' });
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      const offer = await meuPc.createOffer();
+      await meuPc.setLocalDescription(offer);
 
       // espera o ICE gathering terminar (não usamos trickle ICE aqui, é mais simples)
       await new Promise((resolve) => {
-        if (pc.iceGatheringState === 'complete') return resolve();
+        if (meuPc.iceGatheringState === 'complete') return resolve();
         const check = () => {
-          if (pc.iceGatheringState === 'complete') {
-            pc.removeEventListener('icegatheringstatechange', check);
+          if (meuPc.iceGatheringState === 'complete') {
+            meuPc.removeEventListener('icegatheringstatechange', check);
             resolve();
           }
         };
-        pc.addEventListener('icegatheringstatechange', check);
+        meuPc.addEventListener('icegatheringstatechange', check);
       });
 
       const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/sdp' },
-        body: pc.localDescription.sdp
+        body: meuPc.localDescription.sdp
       });
+      if (minhaSessao !== sessao) return;
 
+      // 400 = o MediaMTX não achou codec em comum entre a live e o navegador
+      if (response.status === 400) {
+        ativarFallbackHls('codec recusado pelo servidor (' + (await response.text()).trim() + ')');
+        return;
+      }
       if (!response.ok) {
         throw new Error('Servidor respondeu ' + response.status + ' — stream pode não estar ativo');
       }
 
       const answerSdp = await response.text();
-      await pc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
+      await meuPc.setRemoteDescription({ type: 'answer', sdp: answerSdp });
 
     } catch (err) {
+      if (minhaSessao !== sessao) return;
+      console.error(err);
+      setStatus('sem sinal — tentando reconectar em 5s...', 'error');
+      agendarReconexao();
+    }
+  }
+
+  // Conectou mas o navegador não decodifica o vídeo (ex.: sem aceleração de
+  // hardware para o codec): chegam bytes de vídeo e nenhum quadro sai. Nesse caso
+  // troca para HLS, que decodifica por Media Source Extensions.
+  function verificarDecodificacao(minhaSessao, meuPc) {
+    if (decodeTimer) clearTimeout(decodeTimer);
+    decodeTimer = setTimeout(async () => {
+      decodeTimer = null;
+      if (minhaSessao !== sessao) return;
+      try {
+        const stats = await meuPc.getStats();
+        let recebidos = 0;
+        let decodificados = 0;
+        stats.forEach((r) => {
+          if (r.type === 'inbound-rtp' && r.kind === 'video') {
+            recebidos += r.bytesReceived || 0;
+            decodificados += r.framesDecoded || 0;
+          }
+        });
+        if (minhaSessao !== sessao) return;
+        if (recebidos > 0 && decodificados === 0) {
+          ativarFallbackHls('nenhum quadro decodificado em ' + DECODE_TIMEOUT_MS / 1000 + 's');
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    }, DECODE_TIMEOUT_MS);
+  }
+
+  // hls.js só é baixado se alguém realmente cair no fallback
+  let hlsJsPromise = null;
+  function carregarHlsJs() {
+    if (window.Hls) return Promise.resolve();
+    if (!hlsJsPromise) {
+      hlsJsPromise = new Promise((resolve, reject) => {
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js';
+        s.onload = resolve;
+        s.onerror = () => { hlsJsPromise = null; reject(new Error('falha ao carregar hls.js')); };
+        document.head.appendChild(s);
+      });
+    }
+    return hlsJsPromise;
+  }
+
+  async function conectarHls(minhaSessao) {
+    // /hls aponta para a porta 8888 do MediaMTX pelo proxy do Apache
+    const url = '/hls/live/' + nomeDaLive() + '/index.m3u8';
+    setStatus('conectando (modo compatibilidade)...');
+
+    try {
+      await carregarHlsJs();
+      if (minhaSessao !== sessao) return;
+
+      if (window.Hls && Hls.isSupported()) {
+        hls = new Hls({ lowLatencyMode: true });
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {
+          if (minhaSessao !== sessao) return;
+          setStatus('ao vivo (modo compatibilidade, ~3-4 s de atraso)', 'recording');
+          video.play().catch(() => {});
+        });
+        hls.on(Hls.Events.ERROR, (_, data) => {
+          if (!data.fatal || minhaSessao !== sessao) return;
+          console.error('HLS:', data);
+          setStatus('sem sinal — tentando reconectar em 5s...', 'error');
+          if (hls) { hls.destroy(); hls = null; }
+          agendarReconexao();
+        });
+        hls.loadSource(url);
+        hls.attachMedia(video);
+      } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        // Safari no iPhone não tem MSE, mas toca HLS nativamente
+        video.src = url;
+        video.play().catch(() => {});
+        setStatus('ao vivo (modo compatibilidade, ~3-4 s de atraso)', 'recording');
+      } else {
+        throw new Error('navegador sem suporte a HLS');
+      }
+    } catch (err) {
+      if (minhaSessao !== sessao) return;
       console.error(err);
       setStatus('sem sinal — tentando reconectar em 5s...', 'error');
       agendarReconexao();
