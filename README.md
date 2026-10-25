@@ -1,6 +1,6 @@
 # ChampLive
 
-Servidor próprio de transmissão de tela para assistir lives entre amigos, criado como alternativa ao Go Live do Discord. Roda em uma VPS Oracle Cloud com MediaMTX e Apache, acessível em https://champlive.duckdns.org.
+Servidor próprio de transmissão de tela para assistir lives entre amigos, criado como alternativa ao Go Live do Discord. Roda em uma VPS Oracle Cloud com MediaMTX e Apache, acessível em https://champbr.com.
 
 ## O que tem
 
@@ -21,7 +21,7 @@ server/mediamtx.service         serviço systemd do MediaMTX
 
 ## Transmitir pelo OBS
 
-- Servidor: `rtmp://144.22.199.64:1935/live`
+- Servidor: `rtmp://champbr.com:1935/live`
 - Chave: um nome único por pessoa (ex.: `caio`)
 - Saída: H264, perfil `main`, keyframe a cada 2 s, sem B-frames (`bframes=0 repeat_headers=1` no x264)
 
