@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "site/**"
+      - "server/usuarios.cgi"
   workflow_dispatch:
 
 jobs:
@@ -24,6 +25,12 @@ jobs:
         run: |
           rsync -avz --delete -e "ssh -i ~/.ssh/id_deploy" \
             site/ "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/champlive-site/"
+
+      - name: Instalar a API do painel de usuários
+        run: |
+          scp -i ~/.ssh/id_deploy server/usuarios.cgi "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/usuarios.cgi"
+          ssh -i ~/.ssh/id_deploy "${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}" \
+            "sudo install -D -o root -g root -m 755 ~/usuarios.cgi /usr/local/lib/champlive/usuarios.cgi"
 
       - name: Publicar no Apache
         run: |
