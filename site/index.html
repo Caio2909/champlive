@@ -269,6 +269,7 @@
   .player-msg-titulo { font-size: 15px; color: var(--texto-fraco); }
   .player-msg-texto { font-size: 13px; }
   .player-msg-texto.error { color: #F28B8E; }
+  .player-msg-texto { max-width: 560px; line-height: 1.5; }
   .player-selos {
     position: absolute;
     top: 14px;
@@ -885,6 +886,10 @@
   let whepSessaoUrl = null; // URL da sessão WHEP atual, para encerrá-la com DELETE
   let sessao = 0;     // invalida callbacks de conexões antigas
   let modoHls = false; // true quando o WebRTC falhou por codec nesta live
+  // Quando nem WebRTC nem HLS decodificam o codec da live (ex.: H.265 sem suporte
+  // no navegador), o player para de tentar e guarda aqui a "publicação" que falhou.
+  // Só tenta de novo quando ela muda (streamer reiniciou a live ou trocou o codec).
+  let codecTravado = null;
   let STREAM_PATH = 'live/caio'; // live padrão ao abrir a página
   let escolheuLive = false;      // vira true quando alguém clica numa live
 
@@ -930,6 +935,7 @@
     if (pathOverride && pathOverride !== STREAM_PATH) {
       STREAM_PATH = pathOverride;
       modoHls = false; // outra live pode usar outro codec, então tenta WebRTC de novo
+      codecTravado = null;
       fpsAtual = null;
       renderizarLives();
     }
@@ -941,6 +947,38 @@
     } else {
       conectarWebrtc(minhaSessao);
     }
+  }
+
+  const CODECS_VIDEO = ['H264', 'H265', 'AV1', 'VP9', 'VP8', 'MPEG-4 Video', 'MPEG-1/2 Video', 'M-JPEG'];
+  const NOME_CODEC = { H264: 'H.264', H265: 'H.265 (HEVC)' };
+
+  // codec de vídeo da live segundo a API do MediaMTX (ex.: 'H264', 'H265')
+  function codecDeVideo(p) {
+    if (!p) return '';
+    const lista = (p.tracks2 || []).map(t => t.codec).concat(p.tracks || []);
+    return lista.find(c => CODECS_VIDEO.includes(c)) || '';
+  }
+
+  // muda quando o streamer reinicia a live ou troca o codec
+  function idPublicacao(p) {
+    return p ? (p.onlineTime || p.readyTime || '') + '|' + codecDeVideo(p) : '';
+  }
+
+  function textoCodecNaoSuportado() {
+    const codec = codecDeVideo(ultimosPaths.find(p => p.name === STREAM_PATH));
+    const nome = NOME_CODEC[codec] || codec;
+    return (nome ? 'Esta live está em ' + nome + ', que' : 'Esta live usa um formato de vídeo que') +
+      ' este navegador não consegue reproduzir. Peça para ' + nomeDaLive() +
+      ' trocar o codificador de vídeo do OBS para H.264 (x264 ou NVENC H.264).';
+  }
+
+  function codecNaoSuportado(motivo) {
+    console.warn('Codec da live não suportado neste navegador:', motivo);
+    pararPlayer();
+    sessao++; // descarta callbacks pendentes
+    codecTravado = idPublicacao(ultimosPaths.find(p => p.name === STREAM_PATH));
+    avisoHlsEl.classList.remove('visivel');
+    setStatus(textoCodecNaoSuportado(), 'error');
   }
 
   function ativarFallbackHls(motivo) {
@@ -1115,6 +1153,11 @@
         hls.on(Hls.Events.ERROR, (_, data) => {
           if (!data.fatal || minhaSessao !== sessao) return;
           console.error('HLS:', data);
+          // o MSE também não decodifica o codec: não adianta ficar tentando
+          if (['manifestIncompatibleCodecsError', 'bufferIncompatibleCodecsError', 'bufferAddCodecError'].includes(data.details)) {
+            codecNaoSuportado(data.reason || data.details);
+            return;
+          }
           setStatus('sem sinal no modo compatibilidade — tentando de novo em 5s...', 'error');
           if (hls) { hls.destroy(); hls = null; }
           agendarReconexao();
@@ -1301,7 +1344,9 @@
       nomeEl.textContent = nome;
       const origemEl = document.createElement('span');
       origemEl.className = 'live-origem';
-      origemEl.textContent = origemDaLive(p);
+      const codec = codecDeVideo(p);
+      origemEl.textContent = [origemDaLive(p), codec && codec !== 'H264' ? (codec === 'H265' ? 'H.265' : codec) : '']
+        .filter(Boolean).join(' · ');
       textos.append(nomeEl);
       if (origemEl.textContent) textos.append(origemEl);
 
@@ -1340,7 +1385,9 @@
     infoAvatarEl.style.background = corDoNome(nome);
     document.title = (estaNoAr(atual) ? nome + ' · ' : '') + 'ChampLive';
 
-    if (!aoVivo) {
+    if (!aoVivo && codecTravado !== null) {
+      playerTituloEl.textContent = 'Formato de vídeo não suportado neste navegador';
+    } else if (!aoVivo) {
       playerTituloEl.textContent = (apiOk && !estaNoAr(atual))
         ? nome + ' não está ao vivo agora'
         : 'Tela compartilhada de ' + nome;
@@ -1399,6 +1446,17 @@
         escolheuLive = true;
         const ativos = ultimosPaths.filter(estaNoAr);
         if (ativos.length && !ativos.some(p => p.name === STREAM_PATH)) conectar(ativos[0].name);
+      }
+      if (codecTravado !== null) {
+        const atual = ultimosPaths.find(p => p.name === STREAM_PATH);
+        if (estaNoAr(atual) && idPublicacao(atual) !== codecTravado) {
+          // a live foi reiniciada ou mudou de codec: tenta do zero
+          codecTravado = null;
+          modoHls = false;
+          conectar();
+        } else if (estaNoAr(atual)) {
+          setStatus(textoCodecNaoSuportado(), 'error'); // nome do codec pode ter chegado agora
+        }
       }
     } catch (err) {
       ultimosPaths = [];
