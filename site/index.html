@@ -692,6 +692,10 @@
     <span class="marca-nome">ChampLive</span>
   </a>
   <div class="espaco"></div>
+  <a class="botao botao-contorno" id="linkConta" href="/admin.html" hidden>
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    <span class="rotulo-ajuda" id="linkContaTexto">Conta</span>
+  </a>
   <button type="button" class="botao botao-contorno" onclick="abrirModal('modalAjuda')">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg>
     <span class="rotulo-ajuda">Ajuda</span>
@@ -865,6 +869,17 @@
 </div>
 
 <script>
+  // ===== CONTA (link para o painel de usuários) =====
+  // Só aparece se a API do painel existir; para admins vira "Usuários".
+  fetch('/api/usuarios', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => {
+      if (!d) return;
+      document.getElementById('linkContaTexto').textContent = d.admin ? 'Usuários' : 'Minha conta';
+      document.getElementById('linkConta').hidden = false;
+    })
+    .catch(() => {});
+
   // ===== PLAYER (assistir lives) =====
   const video = document.getElementById('video');
   const playerEl = document.getElementById('player');
