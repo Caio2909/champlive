@@ -882,6 +882,7 @@
   let hls = null;
   let reconnectTimer = null;
   let decodeTimer = null;
+  let whepSessaoUrl = null; // URL da sessão WHEP atual, para encerrá-la com DELETE
   let sessao = 0;     // invalida callbacks de conexões antigas
   let modoHls = false; // true quando o WebRTC falhou por codec nesta live
   let STREAM_PATH = 'live/caio'; // live padrão ao abrir a página
@@ -904,13 +905,25 @@
     return STREAM_PATH.replace(/^live\//, '');
   }
 
+  // Avisa o MediaMTX que saímos. Sem isso a sessão só cai quando o ICE dele
+  // estoura o tempo (~30 s), e até lá ela continua contando como viewer.
+  // keepalive deixa o pedido sair mesmo com a aba fechando.
+  function encerrarWhep(url) {
+    fetch(url, { method: 'DELETE', keepalive: true }).catch(() => {});
+  }
+
   function pararPlayer() {
     if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
     if (decodeTimer) { clearTimeout(decodeTimer); decodeTimer = null; }
+    if (whepSessaoUrl) { encerrarWhep(whepSessaoUrl); whepSessaoUrl = null; }
     if (pc) { pc.close(); pc = null; }
     if (hls) { hls.destroy(); hls = null; }
     video.srcObject = null;
-    video.removeAttribute('src');
+    if (video.hasAttribute('src')) {
+      // sem o load() o Safari continua baixando o HLS nativo antigo
+      video.removeAttribute('src');
+      video.load();
+    }
   }
 
   function conectar(pathOverride) {
@@ -1010,7 +1023,14 @@
         headers: { 'Content-Type': 'application/sdp' },
         body: meuPc.localDescription.sdp
       });
-      if (minhaSessao !== sessao) return;
+      const local = response.ok && response.headers.get('Location');
+      const sessaoUrl = local ? new URL(local, response.url).href : null;
+      if (minhaSessao !== sessao) {
+        // trocou de live ou reconectou enquanto a oferta ia: fecha a sessão que sobrou
+        if (sessaoUrl) encerrarWhep(sessaoUrl);
+        return;
+      }
+      whepSessaoUrl = sessaoUrl;
 
       // 400 = o MediaMTX não achou codec em comum entre a live e o navegador
       if (response.status === 400) {
@@ -1396,6 +1416,17 @@
   setInterval(atualizarLives, 4000);
 
   conectar();
+
+  // Fechar a aba, recarregar ou sair da página encerra a sessão na hora, em vez
+  // de deixar um viewer fantasma no contador. Se o navegador guardar a página
+  // no cache de voltar/avançar, reconecta quando ela volta.
+  window.addEventListener('pagehide', () => {
+    sessao++;
+    pararPlayer();
+  });
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted) conectar();
+  });
 
   // ===== JANELAS (ajuda e transmitir) =====
   function abrirModal(id) {
