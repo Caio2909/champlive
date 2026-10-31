@@ -12,3 +12,8 @@ webrtcAdditionalHosts: [144.22.199.64]
 hlsSegmentDuration: 500ms
 hlsPartDuration: 200ms
 hlsSegmentCount: 7
+
+# SRT para o OBS (já vem ligado no padrão; deixar explícito).
+# OBS publica em srt://champbr.com:8890?streamid=publish:live/<nome>&pkt_size=1316
+srt: yes
+srtAddress: :8890

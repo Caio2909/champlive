@@ -599,6 +599,18 @@
     align-items: center;
   }
   .caixa-codigo .rotulo { color: var(--texto-fraco); }
+  .caixa-codigo code { overflow-wrap: anywhere; }
+  .campo-obs {
+    margin-top: 6px;
+    padding: 10px 12px;
+    background: var(--bg);
+    border: 1px solid var(--borda);
+    border-radius: 10px;
+    color: var(--texto);
+    font: inherit;
+    font-size: 14px;
+  }
+  .campo-obs:focus { outline: none; border-color: var(--destaque); }
   code {
     font-family: var(--fonte-mono);
     font-weight: 500;
@@ -808,17 +820,19 @@
       <li><div><strong>Configure o destino</strong><span>Em Configurações → Transmissão, escolha o serviço Personalizado.</span></div></li>
       <li>
         <div>
-          <strong>Cole o servidor e a chave</strong>
+          <strong>Cole o servidor e deixe a chave em branco</strong>
+          <span>A live sai por SRT, que aceita áudio Opus e não atrasa o som. Digite seu nome para montar o endereço:</span>
+          <input class="campo-obs" id="nomeObs" type="text" autocomplete="off" maxlength="60" placeholder="seu nome (ex.: caio)" aria-label="Seu nome para a live">
           <div class="caixa-codigo grade">
-            <span class="rotulo">Servidor</span><code>rtmp://champbr.com:1935/live</code>
-            <span class="rotulo">Chave</span><code>seu nome (ex.: caio)</code>
+            <span class="rotulo">Servidor</span><code id="urlSrt">srt://champbr.com:8890?streamid=publish:live/SEU-NOME&amp;pkt_size=1316</code>
+            <span class="rotulo">Chave</span><code>deixe em branco</code>
           </div>
         </div>
       </li>
       <li>
         <div>
-          <strong>Ajuste a saída de vídeo</strong>
-          <span>Em Saída (modo Avançado): codificador H264, perfil main, intervalo de keyframe 2 s. Nas opções do x264, cole:</span>
+          <strong>Ajuste a saída</strong>
+          <span>Em Saída (modo Avançado), aba Transmissão: codificador de vídeo H264, perfil main, intervalo de keyframe 2 s, e codificador de áudio FFmpeg Opus (OBS 30 ou mais novo). Nas opções do x264, cole:</span>
           <code class="caixa-codigo">bframes=0 repeat_headers=1</code>
         </div>
       </li>
@@ -1302,7 +1316,7 @@
     return CORES_AVATAR[h % CORES_AVATAR.length];
   }
 
-  // OBS publica por RTMP; a Transmissão Rápida publica por WebRTC (WHIP)
+  // OBS publica por SRT (ou RTMP, antigo); a Transmissão Rápida publica por WebRTC (WHIP)
   function origemDaLive(p) {
     const tipo = ((p && p.source && p.source.type) || '').toLowerCase();
     if (tipo.includes('rtmp') || tipo.includes('srt')) return 'OBS';
@@ -1574,6 +1588,13 @@
     } else {
       nomePreview.textContent = 'Use letras e números. Espaços viram hífen.';
     }
+  });
+
+  // tutorial do OBS: monta o endereço SRT com o nome da pessoa
+  document.getElementById('nomeObs').addEventListener('input', (e) => {
+    const nome = normalizarNome(e.target.value) || 'SEU-NOME';
+    document.getElementById('urlSrt').textContent =
+      'srt://champbr.com:8890?streamid=publish:live/' + nome + '&pkt_size=1316';
   });
 
   function setQuickStatus(text, erro) {

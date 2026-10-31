@@ -6,7 +6,7 @@ Servidor próprio de transmissão de tela para assistir lives entre amigos, cria
 
 - Player WebRTC de baixa latência, com menu das lives ativas e contador de viewers em tempo real
 - Transmissão Rápida pelo navegador (`getDisplayMedia`), sem precisar do OBS
-- Transmissão pelo OBS via RTMP
+- Transmissão pelo OBS via SRT (aceita áudio Opus, sem transcodificar; RTMP continua funcionando)
 - Acesso protegido por senha (Digest) e HTTPS (Let's Encrypt)
 - Painel de usuários em `/admin`: admins criam e excluem usuários, trocam senhas e definem outros admins; quem não é admin pode trocar a própria senha
 
@@ -24,16 +24,28 @@ server/mediamtx.service         serviço systemd do MediaMTX
 
 ## Transmitir pelo OBS
 
-- Servidor: `rtmp://champbr.com:1935/live`
-- Chave: um nome único por pessoa (ex.: `caio`)
+- Servidor: `srt://champbr.com:8890?streamid=publish:live/<nome>&pkt_size=1316` (um nome único por pessoa, ex.: `caio`)
+- Chave: em branco
 - Saída: H264, perfil `main`, keyframe a cada 2 s, sem B-frames (`bframes=0 repeat_headers=1` no x264)
+- Áudio: FFmpeg Opus (OBS 30+). Opus é o codec do WebRTC, então o MediaMTX repassa o áudio direto, sem transcodificar. Pelo RTMP o OBS só manda AAC.
+
+Teste com ffmpeg (sem OBS):
+
+```sh
+ffmpeg -re -f lavfi -i testsrc2=size=1280x720:rate=30 -f lavfi -i sine=frequency=440 \
+  -c:v libx264 -preset veryfast -tune zerolatency -bf 0 -g 60 -c:a libopus -b:a 128k -ar 48000 \
+  -f mpegts "srt://champbr.com:8890?streamid=publish:live/teste&pkt_size=1316"
+```
+
+O antigo `rtmp://champbr.com:1935/live` (chave = nome) continua aceito.
 
 ## Portas abertas na VPS
 
 | Porta | Protocolo | Uso |
 |---|---|---|
 | 443 | TCP | Site (HTTPS) |
-| 1935 | TCP | RTMP (OBS) |
+| 1935 | TCP | RTMP (OBS, antigo) |
+| 8890 | UDP | SRT (OBS) |
 | 8189 | UDP | Mídia WebRTC |
 
 ## Deploy
